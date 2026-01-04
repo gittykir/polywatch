@@ -14,7 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      market_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          details: Json
+          detected_at: string
+          id: string
+          market_id: string | null
+          market_question: string | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          details?: Json
+          detected_at?: string
+          id?: string
+          market_id?: string | null
+          market_question?: string | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          details?: Json
+          detected_at?: string
+          id?: string
+          market_id?: string | null
+          market_question?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_premium: boolean
+          subscription_id: string | null
+          trial_started_at: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          is_premium?: boolean
+          subscription_id?: string | null
+          trial_started_at?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_premium?: boolean
+          subscription_id?: string | null
+          trial_started_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
