@@ -38,11 +38,13 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     
-    // Check if this is a service role call (from cron job) or a user call
+    // Check if this is a service role or anon key call (from cron job) or a user call
     const isServiceRole = token === supabaseServiceKey;
+    const isAnonKey = token === supabaseAnonKey;
+    const isInternalCall = isServiceRole || isAnonKey;
     
-    if (!isServiceRole) {
-      // Verify user JWT for non-service-role calls
+    if (!isInternalCall) {
+      // Verify user JWT for non-internal calls
       const authClient = createClient(supabaseUrl, supabaseAnonKey);
       const { data: { user }, error: authError } = await authClient.auth.getUser(token);
       
@@ -55,7 +57,7 @@ serve(async (req) => {
       }
       console.log(`Authenticated user: ${user.id}`);
     } else {
-      console.log('Service role access (cron job)');
+      console.log(`Internal access: ${isServiceRole ? 'service role' : 'anon key'} (cron job)`);
     }
     
     // Use service role for database operations
