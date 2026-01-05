@@ -23,8 +23,43 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    // Verify authentication - must be a valid user JWT or service role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Check if this is a service role call (from cron job) or a user call
+    const isServiceRole = token === supabaseServiceKey;
+    
+    if (!isServiceRole) {
+      // Verify user JWT for non-service-role calls
+      const authClient = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+      
+      if (authError || !user) {
+        console.error('Authentication failed:', authError?.message);
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+        );
+      }
+      console.log(`Authenticated user: ${user.id}`);
+    } else {
+      console.log('Service role access (cron job)');
+    }
+    
+    // Use service role for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log('Fetching markets from Polymarket API...');
     
