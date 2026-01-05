@@ -1,1 +1,4 @@
 project_id = "yhefwlkpyybonlhbijoc"
+
+[functions.sync-polymarket]
+verify_jwt = false
