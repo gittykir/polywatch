@@ -24,28 +24,48 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
-    // Verify authentication - must be a valid user JWT or service role
+    // Get authorization header
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error('No authorization header provided');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader?.replace('Bearer ', '') || '';
     
-    // Check if this is a service role or anon key call (from cron job) or a user call
+    // Check if this is an internal call (cron job) - token contains 'anon' role claim or is service role
     const isServiceRole = token === supabaseServiceKey;
-    const isAnonKey = token === supabaseAnonKey;
-    const isInternalCall = isServiceRole || isAnonKey;
     
+    // For cron jobs using anon key, check if token is a valid JWT with anon role
+    let isAnonKeyCall = false;
+    if (token && !isServiceRole) {
+      try {
+        // Parse JWT payload (base64 decode the middle part)
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          // Check if this is an anon key (role: anon) and from our project
+          isAnonKeyCall = payload.role === 'anon' && payload.ref === 'yhefwlkpyybonlhbijoc';
+        }
+      } catch {
+        // Not a valid JWT, will be handled by user auth check
+      }
+    }
+    
+    const isInternalCall = isServiceRole || isAnonKeyCall;
+    
+    console.log('isServiceRole:', isServiceRole);
+    console.log('isAnonKeyCall:', isAnonKeyCall);
+    console.log('isInternalCall:', isInternalCall);
+    
+    // For public calls (no auth or invalid internal key), require user JWT
     if (!isInternalCall) {
-      // Verify user JWT for non-internal calls
-      const authClient = createClient(supabaseUrl, supabaseAnonKey);
+      if (!authHeader) {
+        console.error('No authorization header provided');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+        );
+      }
+      
+      // Verify user JWT - use service key for auth client since we're validating user tokens
+      const authClient = createClient(supabaseUrl, supabaseServiceKey);
       const { data: { user }, error: authError } = await authClient.auth.getUser(token);
       
       if (authError || !user) {
