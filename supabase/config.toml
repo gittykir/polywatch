@@ -2,3 +2,9 @@ project_id = "yhefwlkpyybonlhbijoc"
 
 [functions.sync-polymarket]
 verify_jwt = false
+
+[functions.create-payment]
+verify_jwt = false
+
+[functions.pesapal-callback]
+verify_jwt = false
