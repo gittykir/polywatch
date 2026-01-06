@@ -36,6 +36,7 @@ const Dashboard = () => {
   const [activeFilter, setActiveFilter] = useState<AlertType>('all');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
@@ -95,6 +96,7 @@ const Dashboard = () => {
   };
 
   const handleUpgrade = async () => {
+    setUpgrading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-payment', {
         body: { email: user?.email }
@@ -112,6 +114,8 @@ const Dashboard = () => {
         description: "Could not initialize payment. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setUpgrading(false);
     }
   };
 
@@ -183,6 +187,7 @@ const Dashboard = () => {
         isPremium={isPremium} 
         trialEndsAt={trialEndsAt}
         onUpgrade={handleUpgrade}
+        upgrading={upgrading}
       />
 
       <main className="container mx-auto px-4 py-6 space-y-6">
@@ -192,8 +197,15 @@ const Dashboard = () => {
             <p className="text-muted-foreground mb-4">
               Upgrade to Premium to continue receiving real-time market alerts.
             </p>
-            <Button variant="premium" onClick={handleUpgrade}>
-              Upgrade Now - $9.99/month
+            <Button variant="premium" onClick={handleUpgrade} disabled={upgrading}>
+              {upgrading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Initializing...
+                </>
+              ) : (
+                'Upgrade Now - $9.99/month (KES 1,000)'
+              )}
             </Button>
           </div>
         )}

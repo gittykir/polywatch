@@ -1,14 +1,15 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Activity, LogOut, Crown } from 'lucide-react';
+import { Activity, LogOut, Crown, Loader2 } from 'lucide-react';
 
 interface DashboardHeaderProps {
   isPremium: boolean;
   trialEndsAt: Date | null;
   onUpgrade: () => void;
+  upgrading?: boolean;
 }
 
-const DashboardHeader = ({ isPremium, trialEndsAt, onUpgrade }: DashboardHeaderProps) => {
+const DashboardHeader = ({ isPremium, trialEndsAt, onUpgrade, upgrading = false }: DashboardHeaderProps) => {
   const { signOut, user } = useAuth();
 
   const getTrialStatus = () => {
@@ -50,9 +51,13 @@ const DashboardHeader = ({ isPremium, trialEndsAt, onUpgrade }: DashboardHeaderP
               <span className={`text-sm ${trialStatus.expired ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {trialStatus.text}
               </span>
-              <Button variant="premium" size="sm" onClick={onUpgrade}>
-                <Crown className="h-4 w-4" />
-                Upgrade
+              <Button variant="premium" size="sm" onClick={onUpgrade} disabled={upgrading}>
+                {upgrading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Crown className="h-4 w-4" />
+                )}
+                {upgrading ? 'Processing...' : 'Upgrade'}
               </Button>
             </div>
           )}
