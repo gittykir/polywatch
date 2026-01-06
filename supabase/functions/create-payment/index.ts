@@ -116,8 +116,8 @@ serve(async (req) => {
     
     const orderPayload = {
       id: orderId,
-      currency: 'USD',
-      amount: 9.99,
+      currency: 'KES',
+      amount: 100,
       description: 'PolyWatch Premium Subscription - Monthly',
       callback_url: callbackUrl,
       notification_id: ipnId,
