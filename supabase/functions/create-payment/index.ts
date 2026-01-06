@@ -93,12 +93,40 @@ serve(async (req) => {
     });
 
     const ipnData = await ipnResponse.json();
+    console.log('IPN response:', JSON.stringify(ipnData));
+    
+    if (!ipnResponse.ok || ipnData.error) {
+      console.error('IPN registration failed:', JSON.stringify(ipnData));
+      throw new Error(`IPN registration failed: ${ipnData.error?.message || 'Unknown error'}`);
+    }
+    
     const ipnId = ipnData.ipn_id;
+    if (!ipnId) {
+      console.error('No IPN ID returned');
+      throw new Error('No IPN ID returned from PesaPal');
+    }
 
-    console.log('IPN registered, creating payment order...');
+    console.log('IPN registered with ID:', ipnId);
 
     // Create payment order
     const orderId = `PWO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Use the app's actual URL for callback
+    const callbackUrl = 'https://polywatch-wizard.lovable.app/dashboard?payment=success';
+    
+    const orderPayload = {
+      id: orderId,
+      currency: 'USD',
+      amount: 9.99,
+      description: 'PolyWatch Premium Subscription - Monthly',
+      callback_url: callbackUrl,
+      notification_id: ipnId,
+      billing_address: {
+        email_address: email,
+      },
+    };
+    
+    console.log('Creating order with payload:', JSON.stringify(orderPayload));
     
     const orderResponse = await fetch('https://pay.pesapal.com/v3/api/Transactions/SubmitOrderRequest', {
       method: 'POST',
@@ -107,27 +135,23 @@ serve(async (req) => {
         'Accept': 'application/json',
         'Authorization': `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({
-        id: orderId,
-        currency: 'USD',
-        amount: 9.99,
-        description: 'PolyWatch Premium Subscription - Monthly',
-        callback_url: `${supabaseUrl.replace('supabase.co', 'lovable.app')}/dashboard?payment=success`,
-        notification_id: ipnId,
-        billing_address: {
-          email_address: email,
-        },
-      }),
+      body: JSON.stringify(orderPayload),
     });
 
-    if (!orderResponse.ok) {
-      const errorText = await orderResponse.text();
-      console.error('Order error:', errorText);
-      throw new Error('Failed to create payment order');
-    }
-
     const orderData = await orderResponse.json();
-    console.log('Payment order created:', orderData.order_tracking_id);
+    console.log('Order response:', JSON.stringify(orderData));
+    
+    if (!orderResponse.ok || orderData.error) {
+      console.error('Order creation failed:', JSON.stringify(orderData));
+      throw new Error(`Failed to create payment order: ${orderData.error?.message || orderData.message || 'Unknown error'}`);
+    }
+    
+    if (!orderData.redirect_url) {
+      console.error('No redirect URL in response:', JSON.stringify(orderData));
+      throw new Error('PesaPal did not return a redirect URL');
+    }
+    
+    console.log('Payment order created successfully:', orderData.order_tracking_id);
 
     // Store order reference in database
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
