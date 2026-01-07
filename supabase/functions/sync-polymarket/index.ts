@@ -9,11 +9,23 @@ const corsHeaders = {
 interface PolymarketMarket {
   id: string;
   question: string;
+  outcomePrices: string;
+  clobTokenIds: string;
+  active: boolean;
+  closed: boolean;
+}
+
+interface PolymarketEvent {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
   volume: number;
   liquidity: number;
-  outcomePrices: string;
+  markets: PolymarketMarket[];
   createdAt: string;
-  closed: boolean;
 }
 
 serve(async (req) => {
@@ -83,16 +95,16 @@ serve(async (req) => {
     // Use service role for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Fetching markets from Polymarket API...');
+    console.log('Fetching events from Polymarket API...');
     
-    const response = await fetch('https://gamma-api.polymarket.com/markets?limit=50&active=true');
+    const response = await fetch('https://gamma-api.polymarket.com/events?limit=50&active=true');
     
     if (!response.ok) {
       throw new Error(`Polymarket API error: ${response.status}`);
     }
 
-    const markets: PolymarketMarket[] = await response.json();
-    console.log(`Fetched ${markets.length} markets from Polymarket`);
+    const events: PolymarketEvent[] = await response.json();
+    console.log(`Fetched ${events.length} events from Polymarket`);
 
     const alerts: {
       alert_type: string;
@@ -105,77 +117,89 @@ serve(async (req) => {
     const now = new Date();
     const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
 
-    for (const market of markets) {
-      if (market.closed) continue;
+    let totalMarkets = 0;
 
-      // Parse outcome prices
-      let yesPrice = 0;
-      let noPrice = 0;
-      
-      try {
-        const prices = JSON.parse(market.outcomePrices);
-        if (Array.isArray(prices) && prices.length >= 2) {
-          yesPrice = parseFloat(prices[0]) || 0;
-          noPrice = parseFloat(prices[1]) || 0;
+    for (const event of events) {
+      if (!event.markets || event.markets.length === 0) continue;
+
+      const eventCreatedAt = new Date(event.createdAt);
+      const isNewEvent = eventCreatedAt > fifteenMinutesAgo;
+
+      for (const market of event.markets) {
+        if (market.closed) continue;
+        totalMarkets++;
+
+        // Parse outcome prices
+        let yesPrice = 0;
+        let noPrice = 0;
+        
+        try {
+          const prices = JSON.parse(market.outcomePrices);
+          if (Array.isArray(prices) && prices.length >= 2) {
+            yesPrice = parseFloat(prices[0]) || 0;
+            noPrice = parseFloat(prices[1]) || 0;
+          }
+        } catch {
+          console.log(`Could not parse prices for market ${market.id}`);
+          continue;
         }
-      } catch {
-        console.log(`Could not parse prices for market ${market.id}`);
-        continue;
-      }
 
-      // Check for new markets (created in last 15 minutes)
-      const marketCreatedAt = new Date(market.createdAt);
-      if (marketCreatedAt > fifteenMinutesAgo) {
-        alerts.push({
-          alert_type: 'new_market',
-          market_id: market.id,
-          market_question: market.question,
-          details: {
-            volume: market.volume || 0,
-            liquidity: market.liquidity || 0,
-          },
-          detected_at: now.toISOString(),
-        });
-      }
+        // Check for new markets (event created in last 15 minutes)
+        if (isNewEvent) {
+          alerts.push({
+            alert_type: 'new_market',
+            market_id: market.id,
+            market_question: market.question || event.title,
+            details: {
+              eventTitle: event.title,
+              volume: event.volume || 0,
+              liquidity: event.liquidity || 0,
+            },
+            detected_at: now.toISOString(),
+          });
+        }
 
-      // Check for price imbalances (>1% deviation from 100 cents)
-      const totalPrice = yesPrice + noPrice;
-      const deviation = Math.abs(1 - totalPrice);
-      
-      if (deviation > 0.01) {
-        alerts.push({
-          alert_type: 'price_imbalance',
-          market_id: market.id,
-          market_question: market.question,
-          details: {
-            yesPrice,
-            noPrice,
-            deviation: deviation * 100,
-          },
-          detected_at: now.toISOString(),
-        });
-      }
+        // Check for price imbalances (>1% deviation from 100 cents)
+        const totalPrice = yesPrice + noPrice;
+        const deviation = Math.abs(1 - totalPrice);
+        
+        if (deviation > 0.01) {
+          alerts.push({
+            alert_type: 'price_imbalance',
+            market_id: market.id,
+            market_question: market.question || event.title,
+            details: {
+              eventTitle: event.title,
+              yesPrice,
+              noPrice,
+              deviation: deviation * 100,
+            },
+            detected_at: now.toISOString(),
+          });
+        }
 
-      // Detect potential whale activity (high volume markets)
-      if (market.volume > 100000) {
-        alerts.push({
-          alert_type: 'whale_bet',
-          market_id: market.id,
-          market_question: market.question,
-          details: {
-            amount: market.volume,
-            outcome: yesPrice > noPrice ? 'YES' : 'NO',
-          },
-          detected_at: now.toISOString(),
-        });
+        // Detect potential whale activity (high volume events)
+        if (event.volume > 100000) {
+          alerts.push({
+            alert_type: 'whale_bet',
+            market_id: market.id,
+            market_question: market.question || event.title,
+            details: {
+              eventTitle: event.title,
+              amount: event.volume,
+              outcome: yesPrice > noPrice ? 'YES' : 'NO',
+            },
+            detected_at: now.toISOString(),
+          });
+        }
       }
     }
 
+    console.log(`Processed ${totalMarkets} active markets from ${events.length} events`);
     console.log(`Generated ${alerts.length} alerts`);
 
     // Insert new alerts (avoid duplicates by checking recent entries)
     if (alerts.length > 0) {
-      // Get recent alert market IDs to avoid duplicates
       const { data: recentAlerts } = await supabase
         .from('market_alerts')
         .select('market_id, alert_type')
@@ -206,7 +230,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        marketsProcessed: markets.length,
+        eventsProcessed: events.length,
+        marketsProcessed: totalMarkets,
         alertsGenerated: alerts.length 
       }),
       { 
