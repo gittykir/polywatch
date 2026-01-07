@@ -120,13 +120,16 @@ serve(async (req) => {
     let totalMarkets = 0;
 
     for (const event of events) {
-      if (!event.markets || event.markets.length === 0) continue;
+      // Handle both array and single market formats
+      const markets = Array.isArray(event.markets) ? event.markets : [];
+      if (markets.length === 0) continue;
 
-      const eventCreatedAt = new Date(event.createdAt);
+      const eventCreatedAt = event.createdAt ? new Date(event.createdAt) : new Date(0);
       const isNewEvent = eventCreatedAt > fifteenMinutesAgo;
 
-      for (const market of event.markets) {
-        if (market.closed) continue;
+      for (const market of markets) {
+        // Skip only explicitly closed markets
+        if (market.closed === true) continue;
         totalMarkets++;
 
         // Parse outcome prices
