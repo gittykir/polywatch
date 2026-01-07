@@ -18,6 +18,7 @@ interface AlertCardProps {
   marketQuestion?: string;
   details: AlertDetails;
   detectedAt: string;
+  onClick?: () => void;
 }
 
 const alertConfig = {
@@ -43,7 +44,7 @@ const alertConfig = {
   },
 };
 
-const AlertCard = ({ alertType, marketQuestion, details, detectedAt }: AlertCardProps) => {
+const AlertCard = ({ alertType, marketQuestion, details, detectedAt, onClick }: AlertCardProps) => {
   const validAlertType = alertType as keyof typeof alertConfig;
   const config = alertConfig[validAlertType] || alertConfig.new_market;
   const Icon = config.icon;
@@ -103,7 +104,10 @@ const AlertCard = ({ alertType, marketQuestion, details, detectedAt }: AlertCard
   };
 
   return (
-    <div className="glass-card p-4 fade-in glow-border">
+    <div 
+      className="glass-card p-4 fade-in glow-border cursor-pointer hover:bg-muted/30 transition-colors"
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <div className={`p-2 rounded-lg ${
