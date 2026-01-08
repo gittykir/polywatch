@@ -7,6 +7,7 @@ import StatsGrid from '@/components/StatsGrid';
 import AlertFilters from '@/components/AlertFilters';
 import AlertCard from '@/components/AlertCard';
 import AlertDetailDialog from '@/components/AlertDetailDialog';
+import InstallPromptBanner from '@/components/InstallPromptBanner';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -232,6 +233,8 @@ const Dashboard = () => {
       />
 
       <main className="container mx-auto px-4 py-6 space-y-6">
+        <InstallPromptBanner />
+        
         {!hasAccess && (
           <div className="glass-card p-6 border-destructive/50 text-center">
             <h2 className="text-lg font-semibold mb-2">Trial Expired</h2>
