@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { supabase } from '@/integrations/supabase/client';
 import DashboardHeader from '@/components/DashboardHeader';
 import StatsGrid from '@/components/StatsGrid';
@@ -48,6 +49,7 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { playNotificationSound } = useNotificationSound();
   
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -176,6 +178,9 @@ const Dashboard = () => {
           table: 'market_alerts'
         },
         (payload) => {
+          // Play notification sound for new alerts
+          playNotificationSound();
+          
           if (currentPage === 1) {
             setAlerts((prev) => [payload.new as Alert, ...prev.slice(0, ALERTS_PER_PAGE - 1)]);
           }
@@ -187,7 +192,7 @@ const Dashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [playNotificationSound]);
 
   if (authLoading || loading) {
     return (
